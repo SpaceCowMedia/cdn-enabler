@@ -1,12 +1,12 @@
 <?php
 /*
-Plugin Name: CDN Enabler
+Plugin Name: CDN Enabler (SCM Fork)
 Text Domain: cdn-enabler
 Description: Simple and fast WordPress content delivery network (CDN) integration plugin.
-Author: KeyCDN
+Author: KeyCDN + Space Cow Media
 Author URI: https://www.keycdn.com
 License: GPLv2 or later
-Version: 2.0.8
+Version: 2.0.9
 */
 
 /*
@@ -32,7 +32,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // constants
-define( 'CDN_ENABLER_VERSION', '2.0.8' );
+define( 'CDN_ENABLER_VERSION', '2.0.9' );
 define( 'CDN_ENABLER_MIN_PHP', '5.6' );
 define( 'CDN_ENABLER_MIN_WP', '5.1' );
 define( 'CDN_ENABLER_FILE', __FILE__ );

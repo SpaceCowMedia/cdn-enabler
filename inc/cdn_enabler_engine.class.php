@@ -50,6 +50,8 @@ final class CDN_Enabler_Engine {
 
         if ( ! empty( self::$settings ) ) {
             self::start_buffering();
+            // Run before WP REST Cache save (which uses priority 1000)
+            add_filter( 'rest_pre_echo_response', [ self::class, 'rewrite_rest_pre_echo_response' ], 990, 3 );
         }
     }
 
@@ -280,5 +282,88 @@ final class CDN_Enabler_Engine {
         $rewritten_contents = apply_filters( 'cdn_enabler_contents_after_rewrite', preg_replace_callback( $urls_regex, self::class . '::rewrite_url', $contents ) );
 
         return $rewritten_contents;
+    }
+
+    /**
+     * Check if rewrite should be bypassed for REST responses.
+     *
+     * Similar to bypass_rewrite(), but uses the WP_REST_Request method
+     * instead of relying on $_SERVER['REQUEST_METHOD'].
+     *
+     * @since   2.0.9
+     *
+     * @param   WP_REST_Request $request
+     * @return  bool  true if rewrite should be bypassed, false otherwise
+     */
+    private static function bypass_rewrite_rest( $request ) {
+
+        // bypass rewrite hook
+        if ( apply_filters( 'cdn_enabler_bypass_rewrite', false ) ) {
+            return true;
+        }
+
+        // check request method (REST-aware)
+        $method = method_exists( $request, 'get_method' ) ? strtoupper( $request->get_method() ) : '';
+        if ( empty( $method ) || ! in_array( $method, [ 'GET', 'HEAD' ], true ) ) {
+            return true;
+        }
+
+        // check conditional tags
+        if ( self::is_admin() || is_trackback() || is_robots() || is_preview() ) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public static function rewrite_rest_pre_echo_response( $result, $server, $request ) {
+        if ( self::bypass_rewrite_rest( $request ) ) {
+            return $result;
+        }
+
+        // Don't touch errors
+        if ( is_wp_error( $result ) ) {
+            return $result;
+        }
+
+        // If WP_REST_Response, rewrite its data payload
+        if ( $result instanceof WP_REST_Response ) {
+            $data = $result->get_data();
+            $rewritten = self::rewrite_rest_payload_data( $data );
+            if ( $rewritten !== $data ) {
+                $result->set_data( $rewritten );
+            }
+            return $result;
+        }
+
+        // Otherwise treat it as raw data
+        return self::rewrite_rest_payload_data( $result );
+    }
+
+    /**
+     * @param mixed $data
+     * @return mixed
+     */
+    private static function rewrite_rest_payload_data( $data ) {
+        if ( ! is_array( $data ) && ! is_object( $data ) ) {
+            return $data;
+        }
+
+        $json = wp_json_encode( $data );
+        if ( false === $json || null === $json ) {
+            return $data;
+        }
+
+        $rewritten_json = self::rewriter( $json );
+        if ( $rewritten_json === $json ) {
+            return $data;
+        }
+
+        $decoded = json_decode( $rewritten_json, true );
+        if ( JSON_ERROR_NONE !== json_last_error() || null === $decoded ) {
+            return $data;
+        }
+
+        return $decoded;
     }
 }
